@@ -31,14 +31,11 @@ String version = "T0.01";               // Frimeware Version
 String mode = "send";
 
 char buf_version[5];
-char buf_error[6];
 char buf_name[12];
-char buf_next[12];
 char buf_bV[5];
 char buf_bL[4];
-char buf_ready[12];
-char buf_join[12];
-char buf_init[12];            
+char buf_init[12];
+char buf_print[16];            
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -109,11 +106,6 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* 
 Pangodream_18650_CL BL(ADC_PIN, CONV_FACTOR, READS);
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
-
-SX1276 radio = new Module(LORA_CS, LORA_IRQ, LORA_RST);
-
-const LoRaWANBand_t Region = EU868;
-const uint8_t subBand = 0;  // For US915, change this to 2, otherwise leave on 0
 
 uint32_t nocolor = strip.Color(0, 0, 0);
 uint32_t red = strip.Color(255, 0, 0);
@@ -187,10 +179,10 @@ void printLora(int color) {
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-void printDisplay() {   // tx Transmit Message,  rx Receive Message,   txAdr Receive Address
+void printDisplay(String message) {   // tx Transmit Message,  rx Receive Message,   txAdr Receive Address
 
   sprintf(buf_name, "%s", name);         // byte
-  sprintf(buf_version, "%s", version);
+  sprintf(buf_print,"%s", message);
 
 if ((millis() - lastGetBattery > 10000) || (initBattery == LOW)) {
     bV = BL.getBatteryVolts();
@@ -218,6 +210,7 @@ if ((millis() - lastGetBattery > 10000) || (initBattery == LOW)) {
   u8g2.drawXBM(58, 3, lineWidth, lineHeight, line1);
   u8g2.setDrawColor(1);
   u8g2.drawStr(3,12,buf_name);
+  u8g2.drawStr(3,30,buf_print);
 
   //Battery Indicator
   u8g2.setFont(u8g2_font_6x13_tf);
@@ -295,7 +288,10 @@ void setup() {
 
   Serial.begin(115200);
   while(!Serial);
-  delay(5000);  // Give time to switch to the serial monitor
+  delay(2000);  // Give time to switch to the serial monitor
+
+  pinMode(LED_PIN_INTERNAL, OUTPUT);
+  pinMode(RELAI_PIN, OUTPUT);
 
   u8g2.begin();
   u8g2.clearBuffer();
@@ -306,101 +302,56 @@ void setup() {
   strip.setBrightness(defaultBrightnessLed);    
   strip.show();
 
+  printLora(1);
+  delay(2000);
   tally(blue);
-  printLoad(1, 60, 2);
+  delay(200);
   tally(nocolor);
-  delay(10);
+  printLoad(1, 20, 2);
   tally(blue);
-  printLoad(1, 60, 4);
+  delay(200);
   tally(nocolor);
-  delay(10);
+  printLoad(1, 20, 4);
   tally(blue);
-  printLoad(1, 60, 4);
+  delay(200);
   tally(nocolor);
-
+  printLoad(1, 20, 4);
+  tally(blue);
+  delay(200);
+  tally(nocolor);
 
   Serial.println(F("\nSetup ... "));
-
   Serial.println(F("Initialise the radio"));
+  Serial.println("Version "+ version);
 
   sprintf(buf_init, "%s", "Initialise!");
-  u8g2.drawStr(3,20,buf_init);
+  u8g2.drawStr(3,30,buf_init);
+  sprintf(buf_version, "%s", version);
+  u8g2.drawStr(99,60,buf_version);
+
   u8g2.sendBuffer();
-  printDisplay();
+  delay(2000);
+
 
   int16_t state = radio.begin();
 
-  if (state != RADIOLIB_ERR_NONE) {
-    Serial.print(F("Initialise radio failed, code "));
-    Serial.println(state);
-
-    sprintf(buf_error, "%s", "Error!");
-    u8g2.drawStr(3,20,buf_error);
-    u8g2.sendBuffer();
-    printDisplay();
-    while (true);  // stop
-  }
+  debug(state != RADIOLIB_ERR_NONE, F("Initialise radio failed"), state, true);
   
-
-  Serial.println("Version "+ version);
-  sprintf(buf_version, "%s", version);
-  u8g2.drawStr(99,60,buf_version);
-  u8g2.sendBuffer();
-  printDisplay();
-
-
-
-
   // Setup the OTAA session information
   state = node.beginOTAA(joinEUI, devEUI, nwkKey, appKey);
 
-  if (state != RADIOLIB_ERR_NONE) {
-    Serial.print(F("Initialise node failed, code "));
-    Serial.println(state);
-
-    sprintf(buf_error, "%s", "Error!");
-    u8g2.drawStr(3,20,buf_error);
-    u8g2.sendBuffer();
-    printDisplay();
-    while (true);  // stop
-  }
-
-
+  debug(state != RADIOLIB_ERR_NONE, F("Initialise node failed"), state, true);
 
   Serial.println(F("Join ('login') the LoRaWAN Network"));
-  sprintf(buf_join, "%s", "Join LoRa!");
-  u8g2.drawStr(3,20,buf_join);
-  u8g2.sendBuffer();
-  printDisplay();
+  printDisplay("Join LoRa!");
+  delay(1000);
   state = node.activateOTAA();
 
-  if (state != RADIOLIB_LORAWAN_NEW_SESSION) {
-    Serial.print(F("Join failed, code "));
-    Serial.println(state);
-
-    sprintf(buf_error, "%s", "Error!");
-    u8g2.drawStr(3,20,buf_error);
-    u8g2.sendBuffer();
-    printDisplay();
-    while (true);  // stop
-  }
-
-
-
-
+  debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
 
   Serial.println(F("Ready!\n"));
-  sprintf(buf_ready, "%s", "Ready!");
-  u8g2.drawStr(3,20,buf_ready);
-  u8g2.sendBuffer();
-  printDisplay();
-
-  pinMode(LED_PIN_INTERNAL, OUTPUT);
-  pinMode(RELAI_PIN, OUTPUT);
-  
-  printLora(1);
+  printDisplay("Ready!");
   delay(1000);
-  printDisplay();
 
 }
 
@@ -416,6 +367,11 @@ void loop() {
     if (millis() - lastSendTime > waitSend) {  
 
       Serial.println(F("Sending uplink"));
+      printDisplay("Sending!");
+      tally(blue);
+      relai(HIGH);
+      delay(200);
+      tally(nocolor);
 
       // This is the place to gather the sensor inputs
       // Instead of reading any real sensor, we just generate some random numbers as example
@@ -429,38 +385,25 @@ void loop() {
       uplinkPayload[2] = lowByte(value2);
       
       // Perform an uplink
-      int16_t state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload));    
-
-      if (state < RADIOLIB_ERR_NONE) {
-        Serial.print(F("Error in sendReceive, code "));
-        Serial.println(state);
-
-        sprintf(buf_error, "%s", "Error!");
-        u8g2.drawStr(3,20,buf_error);
-        u8g2.sendBuffer();
-        printDisplay();
-        while (true);  // stop
-      }
-
-
+      int16_t state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload));
+      debug(state < RADIOLIB_ERR_NONE, F("Error in sendReceive"), state, false);    
 
       // Check if a downlink was received 
       // (state 0 = no downlink, state 1/2 = downlink in window Rx1/Rx2)
       if(state > 0) {
         Serial.println(F("Received a downlink"));
+        printDisplay("Downlink!");
+        delay(200);
       } else {
         Serial.println(F("No downlink received"));
+        printDisplay("No downlink");
+        delay(200);
       }
 
       Serial.print(F("Next uplink in 60 seconds"));
-      sprintf(buf_next, "%s", "Next Uplink 60s");
-      u8g2.drawStr(3,20,buf_next);
-      u8g2.sendBuffer();
+      printDisplay("Next Uplink 60s");
+      delay(200);
 
-      printDisplay();
-      tally(blue);
-      relai(HIGH);
-      delay(50);
       lastSendTime = millis();
 
     }
