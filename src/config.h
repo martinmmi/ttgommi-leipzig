@@ -19,20 +19,16 @@ Radio radio = new RadioModule();
 // how often to send an uplink - consider legal & FUP constraints - see notes
 const uint32_t uplinkIntervalSeconds = 5UL * 60UL;    // minutes x seconds
 
-// joinEUI - previous versions of LoRaWAN called this AppEUI
-// for development purposes you can use all zeros - see wiki for details
-#define RADIOLIB_LORAWAN_JOIN_EUI  0x0000000000000000
+// joinEUI - vorher AppEUI
+uint64_t joinEUI = 0x0000000000000000;
 
-// the Device EUI & two keys can be generated on the TTN console 
-#ifndef RADIOLIB_LORAWAN_DEV_EUI   // Replace with your Device EUI
-#define RADIOLIB_LORAWAN_DEV_EUI   0x70B3D57ED0073D9D
-#endif
-#ifndef RADIOLIB_LORAWAN_APP_KEY   // Replace with your App Key 
-#define RADIOLIB_LORAWAN_APP_KEY   0xA1, 0x68, 0x74, 0xA7, 0x48, 0x5E, 0x16, 0x50, 0x93, 0x03, 0x79, 0x0C, 0xEF, 0x0E, 0xB1, 0x81
-#endif
-#ifndef RADIOLIB_LORAWAN_NWK_KEY   // Put your Nwk Key here
-#define RADIOLIB_LORAWAN_NWK_KEY   0x6F, 0x60, 0x9D, 0x44, 0x14, 0xCC, 0x35, 0x09, 0x77, 0x24, 0x68, 0xC9, 0x30, 0x51, 0xE9, 0x63
-#endif
+// Device EUI
+uint64_t devEUI  = 0x70B3D57ED0073D9D;
+
+// AppKey und NwkKey
+uint8_t appKey[16] = { 0xA1,0x68,0x74,0xA7,0x48,0x5E,0x16,0x50,0x93,0x03,0x79,0x0C,0xEF,0x0E,0xB1,0x81 };
+uint8_t nwkKey[16] = { 0x6F,0x60,0x9D,0x44,0x14,0xCC,0x35,0x09,0x77,0x24,0x68,0xC9,0x30,0x51,0xE9,0x63 };
+
 #ifndef CONFIG_H
 #define CONFIG_H
 void printDisplay(String message);
@@ -46,15 +42,6 @@ const LoRaWANBand_t Region = EU868;
 
 // subband choice: for US915/AU915 set to 2, for CN470 set to 1, otherwise leave on 0
 const uint8_t subBand = 0;
-
-// ============================================================================
-// Below is to support the sketch - only make changes if the notes say so ...
-
-// copy over the EUI's & keys in to the something that will not compile if incorrectly formatted
-uint64_t joinEUI =   RADIOLIB_LORAWAN_JOIN_EUI;
-uint64_t devEUI  =   RADIOLIB_LORAWAN_DEV_EUI;
-uint8_t appKey[] = { RADIOLIB_LORAWAN_APP_KEY };
-uint8_t nwkKey[] = { RADIOLIB_LORAWAN_NWK_KEY };
 
 // create the LoRaWAN node
 LoRaWANNode node(&radio, &Region, subBand);

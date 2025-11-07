@@ -35,7 +35,7 @@ char buf_name[12];
 char buf_bV[5];
 char buf_bL[4];
 char buf_init[12];
-char buf_print[16];            
+char buf_print[32];            
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -49,7 +49,7 @@ unsigned long lastDisplayPrint = 0;
 int defaultBrightnessDisplay = 255;   // value from 1 to 255
 int defaultBrightnessLed = 255;       // value from 1 to 255
 int bL = 0;
-int waitSend = 60000;
+int waitSend = 10000;
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -344,14 +344,14 @@ void setup() {
 
   Serial.println(F("Join ('login') the LoRaWAN Network"));
   printDisplay("Join LoRa!");
-  delay(1000);
+  //delay(1000);
   state = node.activateOTAA();
 
   debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
 
   Serial.println(F("Ready!\n"));
   printDisplay("Ready!");
-  delay(1000);
+  //delay(1000);
 
 }
 
@@ -369,8 +369,8 @@ void loop() {
       Serial.println(F("Sending uplink"));
       printDisplay("Sending!");
       tally(blue);
-      relai(HIGH);
-      delay(200);
+      //relai(HIGH);
+      //delay(200);
       tally(nocolor);
 
       // This is the place to gather the sensor inputs
@@ -393,16 +393,16 @@ void loop() {
       if(state > 0) {
         Serial.println(F("Received a downlink"));
         printDisplay("Downlink!");
-        delay(200);
+        //delay(200);
       } else {
         Serial.println(F("No downlink received"));
         printDisplay("No downlink");
-        delay(200);
+        //delay(200);
       }
 
       Serial.print(F("Next uplink in 60 seconds"));
       printDisplay("Next Uplink 60s");
-      delay(200);
+      //delay(200);
 
       lastSendTime = millis();
 
