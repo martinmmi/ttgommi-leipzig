@@ -26,7 +26,7 @@ uint32_t cpu_frequency = 0;
 uint32_t xtal_frequency = 0;
 uint32_t apb_frequency = 0;
 
-String name = "ttgommi1";               // Device Name
+String name = "ttgommi3";               // Device Name
 String version = "T0.01";               // Frimeware Version
 String mode = "send";
 
@@ -47,7 +47,7 @@ unsigned long lastDisplayPrint = 0;
 
 
 int defaultBrightnessDisplay = 255;   // value from 1 to 255
-int defaultBrightnessLed = 255;       // value from 1 to 255
+int defaultBrightnessLed = 155;       // value from 1 to 255
 int bL = 0;
 int waitSend = 10000;
 
@@ -278,11 +278,11 @@ void relai(bool state) {
 
 void setup() {
 
-  setCpuFrequencyMhz(80);               // Set CPU Frequenz 240, 160, 80, 40, 20, 10 Mhz
+  //setCpuFrequencyMhz(80);               // Set CPU Frequenz 240, 160, 80, 40, 20, 10 Mhz
   
-  cpu_frequency = getCpuFrequencyMhz();
-  xtal_frequency = getXtalFrequencyMhz();
-  apb_frequency = getApbFrequency();
+  //cpu_frequency = getCpuFrequencyMhz();
+  //xtal_frequency = getXtalFrequencyMhz();
+  //apb_frequency = getApbFrequency();
 
 //////////////////////////////////////////////////////////////////////
 
@@ -308,10 +308,6 @@ void setup() {
   delay(200);
   tally(nocolor);
   printLoad(1, 20, 2);
-  tally(blue);
-  delay(200);
-  tally(nocolor);
-  printLoad(1, 20, 4);
   tally(blue);
   delay(200);
   tally(nocolor);
@@ -369,8 +365,8 @@ void loop() {
       Serial.println(F("Sending uplink"));
       printDisplay("Sending!");
       tally(blue);
-      //relai(HIGH);
-      //delay(200);
+      relai(HIGH);
+      delay(200);
       tally(nocolor);
 
       // This is the place to gather the sensor inputs
