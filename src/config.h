@@ -118,7 +118,7 @@ void debug(bool failed, const __FlashStringHelper* message, int state, bool halt
     Serial.print(" (");
     Serial.print(state);
     Serial.println(")");
-    printDisplay("Error!");
+    printDisplay("Error");
     while(halt) { delay(1); }
   }
 }

@@ -35,7 +35,7 @@ char buf_name[12];
 char buf_bV[5];
 char buf_bL[4];
 char buf_init[12];
-char buf_print[32];            
+char buf_print[16];            
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -264,8 +264,18 @@ uint32_t chooseColor(byte color) {
   if (color == 0x00) {return nocolor;}
   if (color == 0x01) {return red;}
   if (color == 0x02) {return green;}
-  if (color == 0x03) {return amber;}
+  if (color == 0x03) {return blue;}
+  if (color == 0x04) {return amber;}
+  if (color == 0x05) {return white;}
+
   return nocolor;
+}
+
+bool chooseRelai(byte relay) {
+  if (relay == 0x00) {return LOW;}
+  if (relay == 0x01) {return HIGH;}
+
+  return LOW;
 }
 
 void relai(bool state) {
@@ -320,7 +330,7 @@ void setup() {
   Serial.println(F("Initialise the radio"));
   Serial.println("Version "+ version);
 
-  sprintf(buf_init, "%s", "Initialise!");
+  sprintf(buf_init, "%s", "Initialise");
   u8g2.drawStr(3,30,buf_init);
   sprintf(buf_version, "%s", version);
   u8g2.drawStr(99,60,buf_version);
@@ -339,15 +349,15 @@ void setup() {
   debug(state != RADIOLIB_ERR_NONE, F("Initialise node failed"), state, true);
 
   Serial.println(F("Join ('login') the LoRaWAN Network"));
-  printDisplay("Join LoRa!");
-  //delay(1000);
+  printDisplay("Join LoRa");
+  delay(200);
   state = node.activateOTAA();
 
   debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
 
   Serial.println(F("Ready!\n"));
-  printDisplay("Ready!");
-  //delay(1000);
+  printDisplay("Ready");
+  delay(200);
 
 }
 
@@ -363,42 +373,70 @@ void loop() {
     if (millis() - lastSendTime > waitSend) {  
 
       Serial.println(F("Sending uplink"));
-      printDisplay("Sending!");
-      tally(blue);
-      relai(HIGH);
-      delay(200);
-      tally(nocolor);
+      printDisplay("Sending");
+
 
       // This is the place to gather the sensor inputs
       // Instead of reading any real sensor, we just generate some random numbers as example
       uint8_t value1 = radio.random(100);
-      uint16_t value2 = radio.random(2000);
 
-      // Build payload byte array
-      uint8_t uplinkPayload[3];
-      uplinkPayload[0] = value1;
-      uplinkPayload[1] = highByte(value2);   // See notes for high/lowByte functions
-      uplinkPayload[2] = lowByte(value2);
-      
+      bV = BL.getBatteryVolts();       // z. B. 3.3
+      uint16_t bV_mV = bV * 1000;      // 3.3 V -> 3300 mV
+      bL = BL.getBatteryChargeLevel();
+
+      // Build payload byte array for uplink
+      uint8_t uplinkPayload[4];
+
+      uplinkPayload[0] = highByte(bV_mV);
+      uplinkPayload[1] = lowByte(bV_mV);         
+      uplinkPayload[2] = bL;             // SOC 0-100%
+      uplinkPayload[3] = value1;
+
+      // Build payload byte array for downlink
+      uint8_t downlinkPayload[10];
+      size_t downlinkSize = 0;
+      LoRaWANEvent_t uplinkDetails;
+      LoRaWANEvent_t downlinkDetails;
+      uint8_t fPort = 4;
+      bool confirmed = false;
+
       // Perform an uplink
-      int16_t state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload));
+      int16_t state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload), fPort, downlinkPayload, &downlinkSize, confirmed, &uplinkDetails, &downlinkDetails);
       debug(state < RADIOLIB_ERR_NONE, F("Error in sendReceive"), state, false);    
 
       // Check if a downlink was received 
       // (state 0 = no downlink, state 1/2 = downlink in window Rx1/Rx2)
-      if(state > 0) {
+      if(state > 0){
         Serial.println(F("Received a downlink"));
-        printDisplay("Downlink!");
-        //delay(200);
+        printDisplay("Downlink");
+
+        if(downlinkSize > 0) {
+          arrayDump(downlinkPayload, downlinkSize);
+
+          // Control over Downlinkbytes
+          if(downlinkSize >= 2) {
+              // LED nach Byte 0
+              uint32_t col = chooseColor(downlinkPayload[0]);
+              tally(col);
+              // Relais nach Byte 1
+              bool rel = chooseRelai(downlinkPayload[1]);
+              relai(rel);
+              delay(200);
+          }
+        } else {
+            Serial.println(F("Only MAC-Data, no Payload>"));
+            printDisplay("No payload");
+            delay(200);
+        }
       } else {
-        Serial.println(F("No downlink received"));
-        printDisplay("No downlink");
-        //delay(200);
+          Serial.println(F("No downlink received"));
+          printDisplay("No downlink");
+          delay(200);
       }
 
       Serial.print(F("Next uplink in 60 seconds"));
-      printDisplay("Next Uplink 60s");
-      //delay(200);
+      printDisplay("Next 60s");
+      delay(200);
 
       lastSendTime = millis();
 
