@@ -13,6 +13,8 @@
 #include <bitmaps.h>
 #include <rom/rtc.h>
 #include "config.h"
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
@@ -44,12 +46,18 @@ char buf_print[16];
 unsigned long lastSendTime = 0;                   // Last send time
 unsigned long lastGetBattery = 0;
 unsigned long lastDisplayPrint = 0;
-
+unsigned long lastTurnOff = 0;
 
 int defaultBrightnessDisplay = 255;   // value from 1 to 255
 int defaultBrightnessLed = 155;       // value from 1 to 255
 int bL = 0;
-int waitSend = 10000;
+int waitSend = 30000;
+int waitOff = 300000;
+
+float temperature;
+float pressure;
+float altitude;
+float humidity;
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -100,6 +108,13 @@ bool expired = LOW;
 
 #define DISPLAY_CLK         22
 #define DISPLAY_DATA        21
+
+#define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
+#define TIME_TO_SLEEP  (60 * 60)        /* Time ESP32 will go to sleep (in seconds) */
+
+#define SEALEVELPRESSURE_HPA (1027)                  // default 1013.25
+
+Adafruit_BME280 bme; // I2C
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ DISPLAY_CLK, /* data=*/ DISPLAY_DATA);   // ESP32 Thing, HW I2C with pin remapping
 
@@ -288,17 +303,18 @@ void relai(bool state) {
 
 void setup() {
 
+  Serial.begin(115200);
+
   //setCpuFrequencyMhz(80);               // Set CPU Frequenz 240, 160, 80, 40, 20, 10 Mhz
   
+  cpu_frequency = getCpuFrequencyMhz();
+  Serial.println(" "); Serial.print("Cpu Frequenz: "); Serial.println(cpu_frequency);
+
   //cpu_frequency = getCpuFrequencyMhz();
   //xtal_frequency = getXtalFrequencyMhz();
   //apb_frequency = getApbFrequency();
 
-//////////////////////////////////////////////////////////////////////
-
-  Serial.begin(115200);
-  while(!Serial);
-  delay(2000);  // Give time to switch to the serial monitor
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
 
   pinMode(LED_PIN_INTERNAL, OUTPUT);
   pinMode(RELAI_PIN, OUTPUT);
@@ -326,8 +342,8 @@ void setup() {
   delay(200);
   tally(nocolor);
 
-  Serial.println(F("\nSetup ... "));
-  Serial.println(F("Initialise the radio"));
+  Serial.println(F("-------------- Initialise ---------------"));
+  Serial.println(F("Initialise"));
   Serial.println("Version "+ version);
 
   sprintf(buf_init, "%s", "Initialise");
@@ -338,6 +354,13 @@ void setup() {
   u8g2.sendBuffer();
   delay(2000);
 
+  /*
+  bool status = bme.begin(0x76);  
+  if (!status) {
+    Serial.println("Initialise bme280 failed");
+    while (1);
+  }
+  */
 
   int16_t state = radio.begin();
 
@@ -348,6 +371,7 @@ void setup() {
 
   debug(state != RADIOLIB_ERR_NONE, F("Initialise node failed"), state, true);
 
+  Serial.println(F("----------- Join Lora --------------"));
   Serial.println(F("Join ('login') the LoRaWAN Network"));
   printDisplay("Join LoRa");
   delay(200);
@@ -358,6 +382,8 @@ void setup() {
   Serial.println(F("Ready!\n"));
   printDisplay("Ready");
   delay(200);
+
+  lastTurnOff = millis();
 
 }
 
@@ -372,25 +398,48 @@ void loop() {
 
     if (millis() - lastSendTime > waitSend) {  
 
-      Serial.println(F("Sending uplink"));
-      printDisplay("Sending");
+      Serial.println(F("Read sensor"));
+      printDisplay("Read sensor");
 
+      temperature = bme.readTemperature() + 1;
+      pressure = bme.readPressure() / 100.0F;
+      altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+      humidity = bme.readHumidity();
 
-      // This is the place to gather the sensor inputs
-      // Instead of reading any real sensor, we just generate some random numbers as example
-      uint8_t value1 = radio.random(100);
-
+      Serial.print("Temperature = "); Serial.print(temperature); Serial.println(" *C");
+      Serial.print("Pressure = "); Serial.print(pressure); Serial.println(" hPa");
+      Serial.print("Approx. Altitude = "); Serial.print(altitude); Serial.println(" m");
+      Serial.print("Humidity = "); Serial.print(humidity); Serial.println(" %");
+    
       bV = BL.getBatteryVolts();       // z. B. 3.3
       uint16_t bV_mV = bV * 1000;      // 3.3 V -> 3300 mV
       bL = BL.getBatteryChargeLevel();
 
-      // Build payload byte array for uplink
-      uint8_t uplinkPayload[4];
+      Serial.println(F("Sending uplink"));
+      printDisplay("Sending");
 
+      // Build payload byte array for uplink
+      uint8_t uplinkPayload[10];
+
+      int16_t temp_i = (int16_t)(temperature * 100);
+      uint16_t pres_i  = (uint16_t)(pressure * 10);
+      int16_t  alt_i   = (int16_t)(altitude);
+      uint16_t hum_i   = (uint16_t)(humidity * 100);
+      
       uplinkPayload[0] = highByte(bV_mV);
-      uplinkPayload[1] = lowByte(bV_mV);         
-      uplinkPayload[2] = bL;             // SOC 0-100%
-      uplinkPayload[3] = value1;
+      uplinkPayload[1] = lowByte(bV_mV);
+
+      uplinkPayload[2] = highByte(temp_i);
+      uplinkPayload[3] = lowByte(temp_i);
+
+      uplinkPayload[4] = highByte(pres_i);
+      uplinkPayload[5] = lowByte(pres_i);
+
+      uplinkPayload[6] = highByte(alt_i);
+      uplinkPayload[7] = lowByte(alt_i);
+
+      uplinkPayload[8]  = highByte(hum_i);
+      uplinkPayload[9] = lowByte(hum_i);
 
       // Build payload byte array for downlink
       uint8_t downlinkPayload[10];
@@ -441,6 +490,22 @@ void loop() {
       lastSendTime = millis();
 
     }
+
+    if ((millis() - lastTurnOff > waitOff)) {
+
+      lastTurnOff = millis();
+
+      Serial.print(F("Going sleep because of timer"));
+      printDisplay("Going Sleep");
+
+      u8g2.clearBuffer();
+      u8g2.sendBuffer();
+      relai(LOW);
+      tally(nocolor);
+
+      esp_deep_sleep_start();
+    }
+
   }
 }
 
