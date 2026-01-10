@@ -354,13 +354,26 @@ void setup() {
   u8g2.sendBuffer();
   delay(2000);
 
-  /*
+  
   bool status = bme.begin(0x76);  
   if (!status) {
     Serial.println("Initialise bme280 failed");
     while (1);
   }
-  */
+  
+
+  Serial.println(F("Read sensor"));
+  printDisplay("Read sensor");
+
+  temperature = bme.readTemperature() + 1;
+  pressure = bme.readPressure() / 100.0F;
+  altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  humidity = bme.readHumidity();
+
+  Serial.print("Temperature = "); Serial.print(temperature); Serial.println(" *C");
+  Serial.print("Pressure = "); Serial.print(pressure); Serial.println(" hPa");
+  Serial.print("Approx. Altitude = "); Serial.print(altitude); Serial.println(" m");
+  Serial.print("Humidity = "); Serial.print(humidity); Serial.println(" %");
 
   int16_t state = radio.begin();
 
