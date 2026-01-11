@@ -342,7 +342,7 @@ void setup() {
   delay(200);
   tally(nocolor);
 
-  Serial.println(F("-------------- Initialise ---------------"));
+  Serial.println(F("----------- Initialise -------------"));
   Serial.println(F("Initialise"));
   Serial.println("Version "+ version);
 
@@ -354,16 +354,17 @@ void setup() {
   u8g2.sendBuffer();
   delay(2000);
 
-  
   bool status = bme.begin(0x76);  
   if (!status) {
-    Serial.println("Initialise bme280 failed");
+    Serial.println("Initialise BME280 failed");
+    printDisplay("Error Sensor");
+    delay(200);
     while (1);
   }
   
-
-  Serial.println(F("Read sensor"));
-  printDisplay("Read sensor");
+  Serial.println(F("Read Sensor"));
+  printDisplay("Read Sensor");
+  delay(200);
 
   temperature = bme.readTemperature() + 1;
   pressure = bme.readPressure() / 100.0F;
@@ -375,28 +376,33 @@ void setup() {
   Serial.print("Approx. Altitude = "); Serial.print(altitude); Serial.println(" m");
   Serial.print("Humidity = "); Serial.print(humidity); Serial.println(" %");
 
+  printDisplay(String(F("Temp: ")) + String(temperature, 1) + F(" *C"));
+  delay(600);
+
   int16_t state = radio.begin();
 
-  debug(state != RADIOLIB_ERR_NONE, F("Initialise radio failed"), state, true);
+  debug(state != RADIOLIB_ERR_NONE, F("Initialise Radio failed"), state, true);
   
   // Setup the OTAA session information
   state = node.beginOTAA(joinEUI, devEUI, nwkKey, appKey);
 
-  debug(state != RADIOLIB_ERR_NONE, F("Initialise node failed"), state, true);
+  debug(state != RADIOLIB_ERR_NONE, F("Initialise Node failed"), state, true);
 
   Serial.println(F("----------- Join Lora --------------"));
-  Serial.println(F("Join ('login') the LoRaWAN Network"));
-  printDisplay("Join LoRa");
+  Serial.println(F("Join LoRaWAN"));
+  printDisplay("Join LoRaWAN");
   delay(200);
   state = node.activateOTAA();
 
   debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
 
-  Serial.println(F("Ready!\n"));
+  Serial.println(F("Ready to communicate"));
   printDisplay("Ready");
   delay(200);
 
   lastTurnOff = millis();
+
+  lastSendTime = millis() - waitSend;
 
 }
 
@@ -411,8 +417,10 @@ void loop() {
 
     if (millis() - lastSendTime > waitSend) {  
 
-      Serial.println(F("Read sensor"));
-      printDisplay("Read sensor");
+      Serial.println(F("------------------------------------"));
+      Serial.println(F("Sending Uplink"));
+      printDisplay("Uplink");
+      delay(200);
 
       temperature = bme.readTemperature() + 1;
       pressure = bme.readPressure() / 100.0F;
@@ -427,9 +435,6 @@ void loop() {
       bV = BL.getBatteryVolts();       // z. B. 3.3
       uint16_t bV_mV = bV * 1000;      // 3.3 V -> 3300 mV
       bL = BL.getBatteryChargeLevel();
-
-      Serial.println(F("Sending uplink"));
-      printDisplay("Sending");
 
       // Build payload byte array for uplink
       uint8_t uplinkPayload[10];
@@ -469,8 +474,9 @@ void loop() {
       // Check if a downlink was received 
       // (state 0 = no downlink, state 1/2 = downlink in window Rx1/Rx2)
       if(state > 0){
-        Serial.println(F("Received a downlink"));
+        Serial.println(F("Received a Downlink"));
         printDisplay("Downlink");
+        delay(200);
 
         if(downlinkSize > 0) {
           arrayDump(downlinkPayload, downlinkSize);
@@ -487,17 +493,17 @@ void loop() {
           }
         } else {
             Serial.println(F("Only MAC-Data, no Payload>"));
-            printDisplay("No payload");
+            printDisplay("No Payload");
             delay(200);
         }
       } else {
-          Serial.println(F("No downlink received"));
-          printDisplay("No downlink");
+          Serial.println(F("No Downlink received"));
+          printDisplay("No Downlink");
           delay(200);
       }
 
-      Serial.print(F("Next uplink in 60 seconds"));
-      printDisplay("Next 60s");
+      Serial.println(F("Next Uplink in 60 seconds"));
+      printDisplay("Next in 60s");
       delay(200);
 
       lastSendTime = millis();
@@ -508,8 +514,9 @@ void loop() {
 
       lastTurnOff = millis();
 
-      Serial.print(F("Going sleep because of timer"));
+      Serial.print(F("Going Sleep because of Timer"));
       printDisplay("Going Sleep");
+      delay(200);
 
       u8g2.clearBuffer();
       u8g2.sendBuffer();
